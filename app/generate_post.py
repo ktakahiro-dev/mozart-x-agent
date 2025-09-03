@@ -104,7 +104,7 @@ def gen_image_and_fit(client: OpenAI, piece: dict, caption: str, out_path: str):
 
     # Center-crop to 16:9 then resize to 1600x900
     im = Image.open(out_path)
-    w, h = im.size  # 1536x1024 expected
+    w, h = im.size  # expect 1536x1024
     target_ratio = TARGET_W / TARGET_H  # 1.777...
     new_h = int(round(w / target_ratio))  # 1536 -> 864
     if new_h <= h:
