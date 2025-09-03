@@ -29,6 +29,10 @@ GEN_SIZE = "1536x1024"
 
 os.makedirs(OUT_DIR, exist_ok=True)
 
+# ---- helpers ----
+EMOJI_RE = re.compile(r"[\U0001F300-\U0001FAFF\U00002700-\U000027BF]")  # broad emoji range
+HASHTAG_RE = re.compile(r"#\S+")
+
 def choose_piece(today: datetime.date, path: str):
     df = pd.read_csv(path)
     row = df.iloc[today.toordinal() % len(df)]
@@ -37,6 +41,19 @@ def choose_piece(today: datetime.date, path: str):
 def clamp(s: str, max_len: int):
     s = (s or "").strip()
     return s if len(s) <= max_len else s[:max_len-1] + "…"
+
+def strip_hashtags(s: str) -> str:
+    s = HASHTAG_RE.sub("", s or "")
+    s = re.sub(r"\s{2,}", " ", s).strip()
+    return s
+
+def ensure_one_emoji(s: str) -> str:
+    if not EMOJI_RE.search(s or ""):
+        # add a musical emoji if none present
+        cand = "🎵"
+        s2 = (s + " " + cand).strip()
+        return clamp(s2, 120)
+    return s
 
 def extract_json(text: str) -> str:
     m = re.search(r'\{.*\}', text, re.S)
@@ -50,9 +67,9 @@ def extract_json(text: str) -> str:
 def prompt_text(piece: dict) -> str:
     return f"""日本語でモーツァルト作品のX投稿文をJSONで返してください。JSON以外は一切書かないでください。
 {{
-  "tweet": "<全角込み120字以内。ハッシュタグ #Mozart #クラシック を含める>",
-  "alt": "<画像の代替テキスト。80-120字>",
-  "img_caption": "<画像に入れる短い見出し（8-12字）>"
+  "tweet": "<全角込み120字以内。絵文字を1つ入れる。ハッシュタグは入れない（記号#を使わない）>",
+  "alt": "<画像の代替テキスト。80-120字。絵文字とハッシュタグは入れない>",
+  "img_caption": "<画像に入れる短い見出し（8-12字）。絵文字とハッシュタグは入れない>"
 }}
 対象作品: {piece["ja_title"]}（{piece["en_title"]}） / {piece["k"]}
 口調: 温かく簡潔。専門用語を避ける。
@@ -78,9 +95,11 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 raw = call_chat(client, model, prompt_text(piece))
                 blob = extract_json(raw)
                 data = json.loads(blob)
-                tweet = clamp(data.get("tweet",""), 120)
-                alt = clamp(data.get("alt",""), 120)
-                caption = clamp(data.get("img_caption", piece["ja_title"]), 12)
+                tweet = clamp(strip_hashtags(data.get("tweet","")), 120)
+                alt = clamp(strip_hashtags(data.get("alt","")), 120)  # alt: no emoji or hashtags encouraged
+                caption = clamp(strip_hashtags(data.get("img_caption", piece["ja_title"])), 12)
+                # enforce at least one emoji in tweet
+                tweet = ensure_one_emoji(tweet)
                 print(f"[INFO] used_model={model}, attempt={attempt}, json_ok=True")
                 return tweet, alt, caption
             except Exception as e:
@@ -88,8 +107,8 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 print(f"[WARN] JSON parse failed (model={model}, attempt={attempt}): {e}")
                 time.sleep(1.2 * attempt)
 
-    # Fallback
-    tweet = clamp(f"{piece['ja_title']}。朝のひと時にどうぞ。 #Mozart #クラシック", 120)
+    # Fallback（tweetに1絵文字、alt/captionは絵文字なし）
+    tweet = ensure_one_emoji(clamp(f"{piece['ja_title']}。朝のひと時にどうぞ。", 120))
     alt = clamp(f"{piece['ja_title']}（{piece['en_title']}）。モーツァルトの魅力をやさしく伝えるイメージ。", 120)
     caption = clamp(piece['ja_title'], 12)
     print(f"[INFO] used_model=fallback_template, json_ok=False")
@@ -118,13 +137,7 @@ def gen_image_and_fit(client: OpenAI, piece: dict, caption: str, out_path: str):
     im.save(out_path)
 
 def post_to_x(text: str, image_path: str, alt_text: str):
-    # v1.1 for media upload + alt
-    auth = tweepy.OAuth1UserHandler(X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET)
-    api_v1 = tweepy.API(auth)
-    media = api_v1.media_upload(filename=image_path)
-    api_v1.create_media_metadata(media_id=media.media_id, alt_text=alt_text)
-
-    # v2 for tweet
+    # v2 client for tweet
     client_v2 = tweepy.Client(
         consumer_key=X_API_KEY,
         consumer_secret=X_API_SECRET,
@@ -132,7 +145,24 @@ def post_to_x(text: str, image_path: str, alt_text: str):
         access_token_secret=X_ACCESS_SECRET,
         bearer_token=X_BEARER_TOKEN
     )
-    return client_v2.create_tweet(text=text, media_ids=[media.media_id])
+
+    media_ids = None
+    try:
+        # v1.1: media upload + ALT
+        auth = tweepy.OAuth1UserHandler(X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET)
+        api_v1 = tweepy.API(auth)
+        media = api_v1.media_upload(filename=image_path)
+        api_v1.create_media_metadata(media_id=media.media_id, alt_text=alt_text)
+        media_ids = [media.media_id]
+    except tweepy.errors.BadRequest as e:
+        print("[WARN] media upload BadRequest. Posting text-only.", e)
+    except tweepy.errors.Forbidden as e:
+        print("[WARN] media upload Forbidden. Posting text-only.", e)
+
+    if media_ids:
+        return client_v2.create_tweet(text=text, media_ids=media_ids)
+    else:
+        return client_v2.create_tweet(text=text)
 
 def main():
     if not OPENAI_API_KEY:
