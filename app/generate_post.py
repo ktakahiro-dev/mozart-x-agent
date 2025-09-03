@@ -44,31 +44,65 @@ def clamp(s: str, max_len: int):
 
 def strip_hashtags(s: str) -> str:
     s = HASHTAG_RE.sub("", s or "")
-    s = re.sub(r"\s{2,}", " ", s).strip()
+    s = re.sub(r"\\s{2,}", " ", s).strip()
     return s
 
 def ensure_one_emoji(s: str) -> str:
     if not EMOJI_RE.search(s or ""):
-        # add a musical emoji if none present
-        cand = "🎵"
-        s2 = (s + " " + cand).strip()
+        s2 = (s + " 🎵").strip()
         return clamp(s2, 120)
     return s
 
 def extract_json(text: str) -> str:
-    m = re.search(r'\{.*\}', text, re.S)
+    m = re.search(r'\\{.*\\}', text, re.S)
     if m:
         return m.group(0)
-    m2 = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.S|re.I)
+    m2 = re.search(r'```(?:json)?\\s*(\\{.*\\})\\s*```', text, re.S|re.I)
     if m2:
         return m2.group(1)
     return text.strip()
+
+def infer_mood(piece: dict):
+    title_en = (piece.get("en_title","") or "").lower()
+    title_ja = piece.get("ja_title","") or ""
+    ptype = (piece.get("type","") or "").lower()
+    kcat = piece.get("k","") or ""
+
+    is_minor = " minor" in title_en or "短調" in title_ja
+    mood = {"palette":"cream, gray, subtle gold","mood":"elegant, balanced","motifs":"abstract staves and notes"}
+
+    if "requiem" in title_en or "レクイエム" in title_ja or "K.626" in kcat:
+        mood = {"palette":"deep purple, charcoal, candlelight gold",
+                "mood":"solemn, spiritual, reverent",
+                "motifs":"soft choir silhouettes, candlelight glow"}
+    elif "serenade" in title_en or "ナハトムジーク" in title_ja:
+        mood = {"palette":"midnight blue, silver, soft cream",
+                "mood":"serene, nocturnal, tender",
+                "motifs":"starry night hints, crescent moon"}
+    elif "clarinet" in title_en or "クラリネット" in title_ja:
+        mood = {"palette":"warm amber, ivory, slate",
+                "mood":"warm, lyrical, woody",
+                "motifs":"clarinet silhouette, flowing breath lines"}
+    elif "piano" in title_en or "ピアノ" in title_ja or "sonata" in title_en:
+        mood = {"palette":"ivory, ebony, antique gold",
+                "mood":"graceful, clear, intimate",
+                "motifs":"piano keys silhouette, delicate staves"}
+    elif "symphony" in ptype:
+        if is_minor:
+            mood = {"palette":"smoky indigo, graphite, silver",
+                    "mood":"dramatic, tense, stormy",
+                    "motifs":"bold diagonal staves, energetic accents"}
+        else:
+            mood = {"palette":"cream, gold, light blue",
+                    "mood":"bright, spirited, festive",
+                    "motifs":"radiant staves, airy ornaments"}
+    return mood
 
 def prompt_text(piece: dict) -> str:
     return f"""日本語でモーツァルト作品のX投稿文をJSONで返してください。JSON以外は一切書かないでください。
 {{
   "tweet": "<全角込み120字以内。絵文字を1つ入れる。ハッシュタグは入れない（記号#を使わない）>",
-  "alt": "<画像の代替テキスト。80-120字。絵文字とハッシュタグは入れない>",
+  "alt": "<画像の代替テキスト。80-120字。『モーツァルトのイラスト』と背景の雰囲気（色・モチーフ）を簡潔に説明。絵文字/ハッシュタグは入れない>",
   "img_caption": "<画像に入れる短い見出し（8-12字）。絵文字とハッシュタグは入れない>"
 }}
 対象作品: {piece["ja_title"]}（{piece["en_title"]}） / {piece["k"]}
@@ -76,8 +110,14 @@ def prompt_text(piece: dict) -> str:
 """
 
 def prompt_image(piece: dict, caption: str) -> str:
-    return f"""上品で落ち着いた音楽ビジュアル。背景は柔らかな紙質、譜面・五線・楽器シルエットを抽象的に。
-中央に「{caption}」だけを明瞭に配置。色調は白〜生成・グレー基調に金のアクセント。余白多めで可読性重視。重要要素は中央寄せ。上下に十分な余白。"""
+    m = infer_mood(piece)
+    return f"""Elegant poster-like illustration, landscape 1536x1024.
+Include a tasteful **illustrated bust/portrait of Wolfgang Amadeus Mozart** in engraving/etching style (non-photorealistic), balanced with the layout so text remains readable.
+Background: soft paper texture. Motifs: {m['motifs']}.
+Color palette: {m['palette']}. Mood: {m['mood']}.
+Place the Japanese headline "{caption}" centered, high readability (ample contrast).
+Keep key elements near center; leave generous top/bottom margins to allow safe 16:9 cropping.
+"""
 
 def call_chat(client: OpenAI, model: str, prompt: str) -> str:
     rsp = client.chat.completions.create(
@@ -96,35 +136,31 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 blob = extract_json(raw)
                 data = json.loads(blob)
                 tweet = clamp(strip_hashtags(data.get("tweet","")), 120)
-                alt = clamp(strip_hashtags(data.get("alt","")), 120)  # alt: no emoji or hashtags encouraged
+                alt = clamp(strip_hashtags(data.get("alt","")), 120)
                 caption = clamp(strip_hashtags(data.get("img_caption", piece["ja_title"])), 12)
-                # enforce at least one emoji in tweet
                 tweet = ensure_one_emoji(tweet)
-                print(f"[INFO] used_model={model}, attempt={attempt}, json_ok=True")
+                print(f"[INFO] used_model={{model}}, attempt={{attempt}}, json_ok=True")
                 return tweet, alt, caption
             except Exception as e:
                 last_error = e
-                print(f"[WARN] JSON parse failed (model={model}, attempt={attempt}): {e}")
+                print(f"[WARN] JSON parse failed (model={{model}}, attempt={{attempt}}): {{e}}")
                 time.sleep(1.2 * attempt)
 
-    # Fallback（tweetに1絵文字、alt/captionは絵文字なし）
     tweet = ensure_one_emoji(clamp(f"{piece['ja_title']}。朝のひと時にどうぞ。", 120))
-    alt = clamp(f"{piece['ja_title']}（{piece['en_title']}）。モーツァルトの魅力をやさしく伝えるイメージ。", 120)
+    alt = clamp(f"モーツァルトのイラストと{piece['ja_title']}の雰囲気を表す上品な背景ポスター。", 120)
     caption = clamp(piece['ja_title'], 12)
     print(f"[INFO] used_model=fallback_template, json_ok=False")
     return tweet, alt, caption
 
 def gen_image_and_fit(client: OpenAI, piece: dict, caption: str, out_path: str):
-    # Generate at allowed size
     img = client.images.generate(model=IMAGE_MODEL, prompt=prompt_image(piece, caption), size=GEN_SIZE)
     b64 = img.data[0].b64_json
     with open(out_path, "wb") as f:
         f.write(base64.b64decode(b64))
 
-    # Center-crop to 16:9 then resize to 1600x900
     im = Image.open(out_path)
     w, h = im.size  # expect 1536x1024
-    target_ratio = TARGET_W / TARGET_H  # 1.777...
+    target_ratio = TARGET_W / TARGET_H
     new_h = int(round(w / target_ratio))  # 1536 -> 864
     if new_h <= h:
         top = (h - new_h) // 2  # 1024-864=160 -> 80px top/bottom
@@ -137,7 +173,6 @@ def gen_image_and_fit(client: OpenAI, piece: dict, caption: str, out_path: str):
     im.save(out_path)
 
 def post_to_x(text: str, image_path: str, alt_text: str):
-    # v2 client for tweet
     client_v2 = tweepy.Client(
         consumer_key=X_API_KEY,
         consumer_secret=X_API_SECRET,
@@ -148,7 +183,6 @@ def post_to_x(text: str, image_path: str, alt_text: str):
 
     media_ids = None
     try:
-        # v1.1: media upload + ALT
         auth = tweepy.OAuth1UserHandler(X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET)
         api_v1 = tweepy.API(auth)
         media = api_v1.media_upload(filename=image_path)
