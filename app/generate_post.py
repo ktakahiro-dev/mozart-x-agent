@@ -28,42 +28,41 @@ GEN_SIZE = "1536x1024"
 
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# ---- famous works (curated) ----
+# ---- curated famous works (with key signatures where applicable) ----
 def famous_works():
-    # Each item: k, ja_title, en_title, type, seasons, times
     return [
-        {"k":"K.525","ja_title":"アイネ・クライネ・ナハトムジーク","en_title":"Serenade No. 13 in G, \"Eine kleine Nachtmusik\"","type":"Serenade","seasons":["夏","春","秋"],"times":["夕暮れ","夜"]},
-        {"k":"K.550","ja_title":"交響曲第40番 ト短調","en_title":"Symphony No. 40 in G minor","type":"Symphony","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
-        {"k":"K.551","ja_title":"交響曲第41番 ハ長調『ジュピター』","en_title":"Symphony No. 41 in C, \"Jupiter\"","type":"Symphony","seasons":["春","夏"],"times":["朝","昼"]},
-        {"k":"K.626","ja_title":"レクイエム ニ短調","en_title":"Requiem in D minor","type":"Choral","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
-        {"k":"K.620","ja_title":"歌劇『魔笛』","en_title":"The Magic Flute","type":"Opera","seasons":["夏","秋"],"times":["夕暮れ","夜"]},
-        {"k":"K.492","ja_title":"歌劇『フィガロの結婚』","en_title":"The Marriage of Figaro","type":"Opera","seasons":["春"],"times":["朝","昼"]},
-        {"k":"K.527","ja_title":"歌劇『ドン・ジョヴァンニ』","en_title":"Don Giovanni","type":"Opera","seasons":["秋"],"times":["夜"]},
-        {"k":"K.467","ja_title":"ピアノ協奏曲第21番 ハ長調","en_title":"Piano Concerto No. 21 in C","type":"Piano Concerto","seasons":["春","夏"],"times":["朝","昼"]},
-        {"k":"K.488","ja_title":"ピアノ協奏曲第23番 イ長調","en_title":"Piano Concerto No. 23 in A","type":"Piano Concerto","seasons":["春","秋"],"times":["昼","夕暮れ"]},
-        {"k":"K.466","ja_title":"ピアノ協奏曲第20番 ニ短調","en_title":"Piano Concerto No. 20 in D minor","type":"Piano Concerto","seasons":["冬","秋"],"times":["夕暮れ","夜"]},
-        {"k":"K.331","ja_title":"ピアノソナタ第11番 イ長調『トルコ行進曲付き』","en_title":"Piano Sonata No. 11 in A (\"Alla Turca\")","type":"Piano Sonata","seasons":["春","夏"],"times":["朝","昼"]},
-        {"k":"K.183","ja_title":"交響曲第25番 ト短調","en_title":"Symphony No. 25 in G minor","type":"Symphony","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
-        {"k":"K.201","ja_title":"交響曲第29番 イ長調","en_title":"Symphony No. 29 in A","type":"Symphony","seasons":["春","夏"],"times":["朝","昼"]},
-        {"k":"K.361","ja_title":"セレナード第10番 変ロ長調『グラン・パルティータ』","en_title":"Serenade No. 10 in B♭, \"Gran Partita\"","type":"Serenade","seasons":["春","夏"],"times":["夕暮れ","夜"]},
-        {"k":"K.622","ja_title":"クラリネット協奏曲 イ長調","en_title":"Clarinet Concerto in A","type":"Concerto","seasons":["秋"],"times":["夕暮れ","夜"]},
-        {"k":"K.581","ja_title":"クラリネット五重奏曲 イ長調","en_title":"Clarinet Quintet in A","type":"Chamber","seasons":["秋"],"times":["夕暮れ","夜"]},
-        {"k":"K.618","ja_title":"アヴェ・ヴェルム・コルプス","en_title":"Ave verum corpus","type":"Choral","seasons":["夏"],"times":["夕暮れ","夜"]},
-        {"k":"K.265","ja_title":"きらきら星変奏曲","en_title":"Twelve Variations on \"Ah vous dirai-je, Maman\" (Twinkle Variations)","type":"Piano","seasons":["春","夏","秋","冬"],"times":["朝","昼"]},
-        {"k":"K.397","ja_title":"幻想曲 ニ短調","en_title":"Fantasia in D minor","type":"Piano","seasons":["冬","秋"],"times":["夜"]},
-        {"k":"K.216","ja_title":"ヴァイオリン協奏曲第3番 ト長調","en_title":"Violin Concerto No. 3 in G","type":"Violin Concerto","seasons":["春"],"times":["昼","朝"]},
-        {"k":"K.218","ja_title":"ヴァイオリン協奏曲第4番 ニ長調","en_title":"Violin Concerto No. 4 in D","type":"Violin Concerto","seasons":["春","夏"],"times":["昼"]},
-        {"k":"K.219","ja_title":"ヴァイオリン協奏曲第5番 イ長調『トルコ風』","en_title":"Violin Concerto No. 5 in A \"Turkish\"","type":"Violin Concerto","seasons":["夏","秋"],"times":["昼","夕暮れ"]},
-        {"k":"K.317","ja_title":"ミサ曲 ハ長調『戴冠式ミサ』","en_title":"Coronation Mass in C","type":"Choral","seasons":["春"],"times":["朝","昼"]},
-        {"k":"K.320","ja_title":"セレナード第9番 ニ長調『ポストホルン』","en_title":"Serenade No. 9 in D, \"Posthorn\"","type":"Serenade","seasons":["夏"],"times":["夕暮れ","夜"]},
-        {"k":"K.545","ja_title":"ピアノソナタ第16番 ハ長調『ソナタ・ファチレ』","en_title":"Piano Sonata No. 16 in C, \"Sonata facile\"","type":"Piano Sonata","seasons":["春","夏","秋","冬"],"times":["朝","昼"]},
-        {"k":"K.136","ja_title":"ディヴェルティメント ニ長調","en_title":"Divertimento in D, K.136","type":"Divertimento","seasons":["春"],"times":["朝","昼"]},
-        {"k":"K.314","ja_title":"オーボエ協奏曲 ハ長調","en_title":"Oboe Concerto in C","type":"Concerto","seasons":["春"],"times":["昼"]},
+        {"k":"K.525","ja_title":"アイネ・クライネ・ナハトムジーク","en_title":"Eine kleine Nachtmusik","type":"Serenade","key":None,"seasons":["夏","春","秋"],"times":["夕暮れ","夜"]},
+        {"k":"K.550","ja_title":"交響曲第40番","en_title":"Symphony No. 40","type":"Symphony","key":"ト短調","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
+        {"k":"K.551","ja_title":"交響曲第41番『ジュピター』","en_title":"Symphony No. 41 \"Jupiter\"","type":"Symphony","key":"ハ長調","seasons":["春","夏"],"times":["朝","昼"]},
+        {"k":"K.626","ja_title":"レクイエム","en_title":"Requiem","type":"Choral","key":"ニ短調","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
+        {"k":"K.620","ja_title":"歌劇『魔笛』","en_title":"The Magic Flute","type":"Opera","key":None,"seasons":["夏","秋"],"times":["夕暮れ","夜"]},
+        {"k":"K.492","ja_title":"歌劇『フィガロの結婚』","en_title":"The Marriage of Figaro","type":"Opera","key":None,"seasons":["春"],"times":["朝","昼"]},
+        {"k":"K.527","ja_title":"歌劇『ドン・ジョヴァンニ』","en_title":"Don Giovanni","type":"Opera","key":None,"seasons":["秋"],"times":["夜"]},
+        {"k":"K.467","ja_title":"ピアノ協奏曲第21番","en_title":"Piano Concerto No. 21","type":"Piano Concerto","key":"ハ長調","seasons":["春","夏"],"times":["朝","昼"]},
+        {"k":"K.488","ja_title":"ピアノ協奏曲第23番","en_title":"Piano Concerto No. 23","type":"Piano Concerto","key":"イ長調","seasons":["春","秋"],"times":["昼","夕暮れ"]},
+        {"k":"K.466","ja_title":"ピアノ協奏曲第20番","en_title":"Piano Concerto No. 20","type":"Piano Concerto","key":"ニ短調","seasons":["冬","秋"],"times":["夕暮れ","夜"]},
+        {"k":"K.331","ja_title":"ピアノソナタ第11番『トルコ行進曲付き』","en_title":"Piano Sonata No. 11","type":"Piano Sonata","key":"イ長調","seasons":["春","夏"],"times":["朝","昼"]},
+        {"k":"K.183","ja_title":"交響曲第25番","en_title":"Symphony No. 25","type":"Symphony","key":"ト短調","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
+        {"k":"K.201","ja_title":"交響曲第29番","en_title":"Symphony No. 29","type":"Symphony","key":"イ長調","seasons":["春","夏"],"times":["朝","昼"]},
+        {"k":"K.361","ja_title":"セレナード第10番『グラン・パルティータ』","en_title":"Serenade No. 10 \"Gran Partita\"","type":"Serenade","key":"変ロ長調","seasons":["春","夏"],"times":["夕暮れ","夜"]},
+        {"k":"K.622","ja_title":"クラリネット協奏曲","en_title":"Clarinet Concerto","type":"Concerto","key":"イ長調","seasons":["秋"],"times":["夕暮れ","夜"]},
+        {"k":"K.581","ja_title":"クラリネット五重奏曲","en_title":"Clarinet Quintet","type":"Chamber","key":"イ長調","seasons":["秋"],"times":["夕暮れ","夜"]},
+        {"k":"K.618","ja_title":"アヴェ・ヴェルム・コルプス","en_title":"Ave verum corpus","type":"Choral","key":"ニ長調","seasons":["夏"],"times":["夕暮れ","夜"]},
+        {"k":"K.265","ja_title":"きらきら星変奏曲","en_title":"Twinkle Variations","type":"Piano","key":"ハ長調","seasons":["春","夏","秋","冬"],"times":["朝","昼"]},
+        {"k":"K.397","ja_title":"幻想曲 ニ短調","en_title":"Fantasia in D minor","type":"Piano","key":"ニ短調","seasons":["冬","秋"],"times":["夜"]},
+        {"k":"K.216","ja_title":"ヴァイオリン協奏曲第3番","en_title":"Violin Concerto No. 3","type":"Violin Concerto","key":"ト長調","seasons":["春"],"times":["昼","朝"]},
+        {"k":"K.218","ja_title":"ヴァイオリン協奏曲第4番","en_title":"Violin Concerto No. 4","type":"Violin Concerto","key":"ニ長調","seasons":["春","夏"],"times":["昼"]},
+        {"k":"K.219","ja_title":"ヴァイオリン協奏曲第5番『トルコ風』","en_title":"Violin Concerto No. 5 \"Turkish\"","type":"Violin Concerto","key":"イ長調","seasons":["夏","秋"],"times":["昼","夕暮れ"]},
+        {"k":"K.317","ja_title":"戴冠式ミサ","en_title":"Coronation Mass","type":"Choral","key":"ハ長調","seasons":["春"],"times":["朝","昼"]},
+        {"k":"K.320","ja_title":"セレナード第9番『ポストホルン』","en_title":"Serenade No. 9 \"Posthorn\"","type":"Serenade","key":"ニ長調","seasons":["夏"],"times":["夕暮れ","夜"]},
+        {"k":"K.545","ja_title":"ピアノソナタ第16番『ソナタ・ファチレ』","en_title":"Piano Sonata No. 16","type":"Piano Sonata","key":"ハ長調","seasons":["春","夏","秋","冬"],"times":["朝","昼"]},
+        {"k":"K.136","ja_title":"ディヴェルティメント","en_title":"Divertimento K.136","type":"Divertimento","key":"ニ長調","seasons":["春"],"times":["朝","昼"]},
+        {"k":"K.314","ja_title":"オーボエ協奏曲","en_title":"Oboe Concerto","type":"Concerto","key":"ハ長調","seasons":["春"],"times":["昼"]},
     ]
 
 # ---- helpers ----
-EMOJI_RE = re.compile(r"[\\U0001F300-\\U0001FAFF\\U00002700-\\U000027BF]")
-HASHTAG_RE = re.compile(r"#\\S+")
+EMOJI_RE = re.compile(r"[\U0001F300-\U0001FAFF\U00002700-\U000027BF]")
+HASHTAG_RE = re.compile(r"#\S+")
 
 def now_jst():
     return datetime.datetime.now(ZoneInfo("Asia/Tokyo"))
@@ -89,7 +88,7 @@ def clamp(s: str, max_len: int):
 
 def strip_hashtags(s: str) -> str:
     s = HASHTAG_RE.sub("", s or "")
-    s = re.sub(r"\\s{2,}", " ", s).strip()
+    s = re.sub(r"\s{2,}", " ", s).strip()
     return s
 
 def ensure_one_emoji(s: str) -> str:
@@ -99,10 +98,10 @@ def ensure_one_emoji(s: str) -> str:
     return s
 
 def extract_json(text: str) -> str:
-    m = re.search(r"\\{.*\\}", text, re.S)
+    m = re.search(r"\{.*\}", text, re.S)
     if m:
         return m.group(0)
-    m2 = re.search(r"```(?:json)?\\s*(\\{.*\\})\\s*```", text, re.S|re.I)
+    m2 = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.S|re.I)
     if m2:
         return m2.group(1)
     return text.strip()
@@ -112,19 +111,21 @@ def choose_piece_auto(today: datetime.date):
     jst = now_jst()
     pod = part_of_day(jst.hour)
     sea = season_by_month(jst.month)["jp"]
-
-    # Filter by season & time
-    cands = [w for w in works if (sea in w["seasons"] or "春夏秋冬" in "".join(w["seasons"])) and (pod in w["times"] or "朝昼夕暮れ夜" in "".join(w["times"]))]
+    cands = [w for w in works if (sea in w["seasons"]) and (pod in w["times"])]
     if not cands:
-        # relax: match either season or time
         cands = [w for w in works if sea in w["seasons"] or pod in w["times"]]
     if not cands:
-        cands = works[:]  # fallback all
-
-    # Deterministic pick for the day
+        cands = works[:]
     seed = int(today.strftime("%Y%m%d"))
     idx = seed % len(cands)
     return cands[idx]
+
+def piece_label(piece: dict) -> str:
+    # Format: 「曲名 調性 K.xxx」 (omit 調性 if N/A)
+    if piece.get("key"):
+        return f"{piece['ja_title']} {piece['key']} {piece['k']}"
+    else:
+        return f"{piece['ja_title']} {piece['k']}"
 
 def prompt_text(piece: dict) -> str:
     jst = now_jst()
@@ -133,53 +134,57 @@ def prompt_text(piece: dict) -> str:
     sea = season_by_month(jst.month)
     date_str = jst.strftime("%Y年%m月%d日")
     time_str = jst.strftime("%H:%M")
+    label = piece_label(piece)
     return f"""日本語でモーツァルト作品のX投稿文をJSONで返してください。JSON以外は一切書かないでください。
 以下の要素を自然に織り込みます：日付({date_str})、時刻({time_str} JST)、曜日({dow})、時間帯({pod})、季節({sea['jp']}:{sea['text_hint']})。
+必ず、ツイート本文の中に **{label}**（曲名＋調性＋K番号。調性が無い作品は曲名＋K番号）を一度だけ含めます。ハッシュタグ禁止。絵文字は1つ入れる。
 {{
-  "tweet": "<全角込み120字以内。季節感と時間帯に触れる。絵文字を1つ入れる。ハッシュタグは入れない（記号#を使わない）>",
-  "alt": "<画像の代替テキスト。80-120字。『モーツァルトのイラスト』＋季節/時間帯の雰囲気（色・モチーフ）を簡潔に。絵文字/ハッシュタグは入れない>",
+  "tweet": "<全角込み120字以内。上の条件を満たす>",
+  "alt": "<画像の代替テキスト。80-120字。ツイート内容の要素（季節/時間帯/楽器/雰囲気）を簡潔に。絵文字/ハッシュタグは入れない>",
   "img_caption": "<画像に入れる短い見出し（8-12字）。絵文字とハッシュタグは入れない>"
 }}
-対象作品: {piece["ja_title"]}（{piece["en_title"]}） / {piece["k"]}
+対象作品: {label}
 口調: 温かく簡潔。専門用語を避ける。
 """
 
 def infer_mood(piece: dict):
-    title_en = (piece.get("en_title","") or "").lower()
     title_ja = piece.get("ja_title","") or ""
     ptype = (piece.get("type","") or "").lower()
-    is_minor = " minor" in title_en or "短調" in title_ja
+    key = piece.get("key")
+    is_minor = key and key.endswith("短調")
     mood = {"palette":"cream, gray, subtle gold","mood":"elegant, balanced","motifs":"abstract staves and notes"}
-
-    if "requiem" in title_en or "レクイエム" in title_ja or piece.get("k")=="K.626":
+    if "レクイエム" in title_ja or piece.get("k")=="K.626":
         mood = {"palette":"deep purple, charcoal, candlelight gold","mood":"solemn, spiritual, reverent","motifs":"soft choir silhouettes, candlelight glow"}
-    elif "nachtmusik" in title_en or "ナハトムジーク" in title_ja:
+    elif "ナハトムジーク" in title_ja:
         mood = {"palette":"midnight blue, silver, soft cream","mood":"serene, nocturnal, tender","motifs":"starry night hints, crescent moon"}
-    elif "clarinet" in title_en or "クラリネット" in title_ja:
+    elif "クラリネット" in title_ja:
         mood = {"palette":"warm amber, ivory, slate","mood":"warm, lyrical, woody","motifs":"clarinet silhouette, flowing breath lines"}
-    elif "piano" in ptype or "sonata" in title_en:
+    elif "ピアノ" in title_ja or "sonata" in ptype:
         mood = {"palette":"ivory, ebony, antique gold","mood":"graceful, clear, intimate","motifs":"piano keys silhouette, delicate staves"}
-    elif "symphony" in ptype:
+    elif "交響曲" in title_ja:
         if is_minor:
             mood = {"palette":"smoky indigo, graphite, silver","mood":"dramatic, tense, stormy","motifs":"bold diagonal staves, energetic accents"}
         else:
             mood = {"palette":"cream, gold, light blue","mood":"bright, spirited, festive","motifs":"radiant staves, airy ornaments"}
-    elif "opera" in ptype:
+    elif "歌劇" in title_ja:
         mood = {"palette":"crimson velvet, gold, ebony","mood":"theatrical, lively","motifs":"stage curtains, mask hints"}
     return mood
 
-def prompt_image(piece: dict, caption: str) -> str:
+def prompt_image(piece: dict, caption: str, tweet_text: str) -> str:
     jst = now_jst()
     pod = part_of_day(jst.hour)
     sea = season_by_month(jst.month)
     m = infer_mood(piece)
-    return f"""Elegant poster-like illustration, landscape 1536x1024.
-Include a tasteful illustrated bust/portrait of Wolfgang Amadeus Mozart (non-photorealistic, engraving/etching style).
-Base mood from piece: palette {m['palette']}, mood {m['mood']}, motifs {m['motifs']}.
-Blend seasonal atmosphere ({sea['jp']}): palette accents {sea['palette']}; motifs {sea['motifs']}.
-Reflect time of day ({pod}) with lighting (e.g., morning soft light / dusk glow / night calm).
-Background: soft paper texture. Keep key elements near center; leave generous top/bottom margins for safe 16:9 crop.
-Place the Japanese headline "{caption}" centered with high readability.
+    # Content-driven: focus on tweet semantics (season/time/instrument/mood). Mozart portrait is OPTIONAL.
+    return f"""Design a content-driven illustration (not photorealistic), landscape 1536x1024, matching the tweet's mood and semantics below.
+- Core idea from tweet: "{tweet_text}"
+- Piece mood: palette {m['palette']}; mood {m['mood']}; motifs {m['motifs']}
+- Season ({sea['jp']}): accents {sea['palette']}; motifs {sea['motifs']}
+- Time of day ({pod}): lighting cues (morning soft light / noon clarity / dusk glow / night calm)
+- Instrument/genre hints should be visible if relevant to the piece (keys, staves, piano keys, clarinet, violin, choir texture, opera stage etc.)
+- Optional: include a **small, subtle cameo** (monogram or miniature silhouette) related to Mozart ONLY IF it adds balance. Do not use a large portrait by default.
+- Paper-like background, elegant typography area for the Japanese caption "{caption}"; centered and highly readable.
+- Keep key elements near center; allow safe 16:9 crop.
 """
 
 def call_chat(client: OpenAI, model: str, prompt: str) -> str:
@@ -191,6 +196,7 @@ def call_chat(client: OpenAI, model: str, prompt: str) -> str:
     return rsp.choices[0].message.content or ""
 
 def gen_text_alt_caption(client: OpenAI, piece: dict):
+    label = piece_label(piece)
     last_error = None
     for model in [TEXT_MODEL, TEXT_MODEL_FALLBACK]:
         for attempt in range(1, MAX_TRIES+1):
@@ -201,6 +207,15 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 tweet = clamp(strip_hashtags(data.get("tweet","")), 120)
                 alt = clamp(strip_hashtags(data.get("alt","")), 120)
                 caption = clamp(strip_hashtags(data.get("img_caption", piece["ja_title"])), 12)
+                # Enforce presence of label once
+                if label not in tweet:
+                    # append with separator if room
+                    sep = " — "
+                    candidate = tweet + sep + label
+                    tweet = clamp(candidate, 120)
+                    if label not in tweet and len(label) < 120:
+                        tweet = clamp(label, 120)  # worst-case, tweet is just the label
+                # Ensure exactly one emoji (at least one; if multiple, keep as-is)
                 tweet = ensure_one_emoji(tweet)
                 print(f"[INFO] used_model={model}, attempt={attempt}, json_ok=True")
                 return tweet, alt, caption
@@ -209,17 +224,19 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 print(f"[WARN] JSON parse failed (model={model}, attempt={attempt}): {e}")
                 time.sleep(1.2 * attempt)
 
+    # Fallback
     jst = now_jst()
     pod = part_of_day(jst.hour)
     sea = season_by_month(jst.month)
-    tweet = ensure_one_emoji(clamp(f"{pod}のひと息に、{sea['text_hint']}とともに{piece['ja_title']}を。", 120))
-    alt = clamp(f"モーツァルトのイラスト。{sea['jp']}の雰囲気と{pod}の光を感じる上品な背景ポスター。", 120)
-    caption = clamp(piece['ja_title'], 12)
+    tweet = clamp(f"{label}。{pod}のひと息に、{sea['text_hint']}とともに。", 120)
+    tweet = ensure_one_emoji(tweet)
+    alt = clamp(f"ツイート内容に合わせたビジュアル。{sea['jp']}の雰囲気と{pod}の光、作品のモチーフを織り込む。", 120)
+    caption = clamp(piece.get('ja_title', 'モーツァルト'), 12)
     print(f"[INFO] used_model=fallback_template, json_ok=False")
     return tweet, alt, caption
 
-def gen_image_and_fit(client: OpenAI, piece: dict, caption: str, out_path: str):
-    img = client.images.generate(model=IMAGE_MODEL, prompt=prompt_image(piece, caption), size=GEN_SIZE)
+def gen_image_and_fit(client: OpenAI, piece: dict, caption: str, out_path: str, tweet_text: str):
+    img = client.images.generate(model=IMAGE_MODEL, prompt=prompt_image(piece, caption, tweet_text), size=GEN_SIZE)
     b64 = img.data[0].b64_json
     with open(out_path, "wb") as f:
         f.write(base64.b64decode(b64))
@@ -271,17 +288,18 @@ def main():
 
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    today = datetime.datetime.now(ZoneInfo("Asia/Tokyo")).date()
+    today = now_jst().date()
     piece = choose_piece_auto(today)
+    label = piece_label(piece)
 
     tweet, alt, caption = gen_text_alt_caption(client, piece)
-    print("[OUT] piece:", piece["k"], piece["ja_title"])
+    print("[OUT] piece:", label)
     print("[OUT] tweet:", tweet)
     print("[OUT] alt  :", alt)
     print("[OUT] caption:", caption)
 
     out_img = os.path.join(OUT_DIR, IMG_FILENAME)
-    gen_image_and_fit(client, piece, caption, out_img)
+    gen_image_and_fit(client, piece, caption, out_img, tweet_text=tweet)
     print("[OUT] image saved:", out_img)
 
     if all([X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET, X_BEARER_TOKEN]):
