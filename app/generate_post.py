@@ -5,7 +5,6 @@ import tweepy
 from PIL import Image
 from openai import OpenAI
 
-# ====== Config via env ======
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TEXT_MODEL = os.getenv("OPENAI_MODEL_TEXT", "gpt-4o-mini")
 TEXT_MODEL_FALLBACK = os.getenv("OPENAI_MODEL_TEXT_FALLBACK", "gpt-4o")
@@ -69,6 +68,11 @@ def part_of_day(hour: int) -> str:
     if 16 <= hour < 20: return "夕暮れ"
     return "夜"
 
+def slot_index(hour: int) -> int:
+    if 5 <= hour < 11: return 0
+    if 11 <= hour < 16: return 1
+    return 2
+
 def season_by_month(m: int) -> dict:
     if m in (3,4,5):
         return {"jp":"春","emoji":["🌸","🌱","🌼"],"palette":"soft sakura pink, fresh green, ivory","motifs":"petals, gentle breeze","text_hint":"春のやわらかな空気"}
@@ -90,7 +94,6 @@ def strip_hashtags(s: str) -> str:
 def strip_emojis(s: str) -> str:
     return EMOJI_RE.sub("", s or "").strip()
 
-# Remove explicit Y/M/D patterns from tweet text
 YMD_PATTERNS = [
     re.compile(r"\\d{1,4}年\\d{1,2}月\\d{1,2}日"),
     re.compile(r"\\d{1,2}月\\d{1,2}日"),
@@ -116,15 +119,12 @@ def emoji_pool(piece: dict, sea: dict, pod: str):
     if "choral" in t or "ミサ" in title: pool += ["🎶","✨"]
     if "serenade" in t or "divertimento" in t: pool += ["🎶","🌙"]
     if "concerto" in t and not pool: pool += ["🎼"]
-
     if pod == "朝": pool += ["🌅","☀️"]
     elif pod == "昼": pool += ["☀️"]
     elif pod == "夕暮れ": pool += ["🌇"]
     else: pool += ["🌙","✨"]
-
     pool += sea["emoji"]
     pool += ["🎵","🎶"]
-
     seen, uniq = set(), []
     for e in pool:
         if e not in seen:
@@ -160,7 +160,8 @@ def choose_piece_auto(today: datetime.date):
         cands = [w for w in works if sea in w["seasons"] or pod in w["times"]]
     if not cands:
         cands = works[:]
-    idx = int(today.strftime("%Y%m%d")) % len(cands)
+    sidx = slot_index(jst.hour)
+    idx = (int(today.strftime("%Y%m%d")) * 3 + sidx) % len(cands)
     return cands[idx]
 
 def piece_label(piece: dict) -> str:
@@ -175,7 +176,6 @@ def prompt_text(piece: dict) -> str:
     pod = part_of_day(jst.hour)
     sea = season_by_month(jst.month)
     label = piece_label(piece)
-    # ⛳️ 年月日・時刻は含めない。曜日・時間帯・季節のみをヒントとして渡す
     return f"""日本語でモーツァルト作品のX投稿文をJSONで返してください。JSON以外は一切書かないでください。
 以下のヒントを自然に織り込みます：曜日({dow})、時間帯({pod})、季節({sea['jp']}:{sea['text_hint']})。
 必ず、ツイート本文の中に **{label}**（曲名＋調性＋K番号。調性が無い作品は曲名＋K番号）を一度だけ含めます。ハッシュタグは禁止。絵文字は入れなくて良い（後工程で付与）。年月日や時刻は一切書かないでください。
@@ -271,19 +271,17 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 tweet = clamp(strip_hashtags(data.get("tweet","")), 120)
                 alt = clamp(strip_hashtags(data.get("alt","")), 120)
                 caption = clamp(strip_hashtags(data.get("img_caption", piece["ja_title"])), 12)
-                # ensure label once
                 if label not in tweet:
                     candidate = (tweet + " — " + label).strip()
                     tweet = clamp(candidate, 120)
                     if label not in tweet and len(label) < 120:
                         tweet = clamp(label, 120)
-                # Remove any accidental Y/M/D mentions
                 tweet = remove_ymd(tweet)
-                # rotate emoji
                 jst = now_jst()
                 pod = part_of_day(jst.hour)
                 sea = season_by_month(jst.month)
-                seed_int = int(jst.strftime("%Y%m%d"))
+                sidx = slot_index(jst.hour)
+                seed_int = int(jst.strftime("%Y%m%d")) * 3 + sidx
                 tweet = insert_rotated_emoji(tweet, piece, sea, pod, seed_int)
                 print(f"[INFO] used_model={model}, attempt={attempt}, json_ok=True")
                 return tweet, alt, caption
@@ -291,13 +289,13 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 last_error = e
                 print(f"[WARN] JSON parse failed (model={model}, attempt={attempt}): {e}")
                 time.sleep(1.2 * attempt)
-    # Fallback
     jst = now_jst()
     pod = part_of_day(jst.hour)
     sea = season_by_month(jst.month)
+    sidx = slot_index(jst.hour)
     tweet = clamp(f"{label}。{pod}のひと息に、{sea['text_hint']}とともに。", 120)
     tweet = remove_ymd(tweet)
-    tweet = insert_rotated_emoji(tweet, piece, sea, pod, int(jst.strftime("%Y%m%d")))
+    tweet = insert_rotated_emoji(tweet, piece, sea, pod, int(jst.strftime("%Y%m%d"))*3+sidx)
     alt = clamp(f"ツイート内容に合わせたビジュアル。{sea['jp']}の雰囲気と{pod}の光、作品のモチーフを織り込む。", 120)
     caption = clamp(piece.get('ja_title', 'モーツァルト'), 12)
     print(f"[INFO] used_model=fallback_template, json_ok=False")
@@ -345,25 +343,6 @@ def post_to_x(text: str, image_path: str, alt_text: str):
         return client_v2.create_tweet(text=text, media_ids=media_ids)
     else:
         return client_v2.create_tweet(text=text)
-
-def piece_label(piece: dict) -> str:
-    if piece.get("key"):
-        return f"{piece['ja_title']} {piece['key']} {piece['k']}"
-    else:
-        return f"{piece['ja_title']} {piece['k']}"
-
-def choose_piece_auto(today: datetime.date):
-    works = famous_works()
-    jst = now_jst()
-    pod = part_of_day(jst.hour)
-    sea = season_by_month(jst.month)["jp"]
-    cands = [w for w in works if (sea in w["seasons"]) and (pod in w["times"])]
-    if not cands:
-        cands = [w for w in works if sea in w["seasons"] or pod in w["times"]]
-    if not cands:
-        cands = works[:]
-    idx = int(today.strftime("%Y%m%d")) % len(cands)
-    return cands[idx]
 
 def main():
     if not OPENAI_API_KEY:
