@@ -26,15 +26,15 @@ GEN_SIZE = "1536x1024"
 os.makedirs(OUT_DIR, exist_ok=True)
 
 def famous_works():
-    # ✅ All entries include explicit key + K number (operas use overture key)
+    # Data can keep keys for operas, but label logic will omit them
     return [
-        {"k":"K.525","ja_title":"アイネ・クライネ・ナハトムジーク","en_title":"Eine kleine Nachtmusik","type":"Serenade","key":"ト長調","seasons":["夏","春","秋"],"times":["夕暮れ","夜"]},  # G major
+        {"k":"K.525","ja_title":"アイネ・クライネ・ナハトムジーク","en_title":"Eine kleine Nachtmusik","type":"Serenade","key":"ト長調","seasons":["夏","春","秋"],"times":["夕暮れ","夜"]},
         {"k":"K.550","ja_title":"交響曲第40番","en_title":"Symphony No. 40","type":"Symphony","key":"ト短調","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
         {"k":"K.551","ja_title":"交響曲第41番『ジュピター』","en_title":"Symphony No. 41 \"Jupiter\"","type":"Symphony","key":"ハ長調","seasons":["春","夏"],"times":["朝","昼"]},
         {"k":"K.626","ja_title":"レクイエム","en_title":"Requiem","type":"Choral","key":"ニ短調","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
-        {"k":"K.620","ja_title":"歌劇『魔笛』","en_title":"The Magic Flute","type":"Opera","key":"変ホ長調","seasons":["夏","秋"],"times":["夕暮れ","夜","朝","昼"]},  # Overture: E-flat major
-        {"k":"K.492","ja_title":"歌劇『フィガロの結婚』","en_title":"The Marriage of Figaro","type":"Opera","key":"ニ長調","seasons":["春"],"times":["朝","昼","夜"]},  # Overture: D major
-        {"k":"K.527","ja_title":"歌劇『ドン・ジョヴァンニ』","en_title":"Don Giovanni","type":"Opera","key":"ニ短調","seasons":["秋"],"times":["夜","夕暮れ"]},  # Overture: D minor
+        {"k":"K.620","ja_title":"歌劇『魔笛』","en_title":"The Magic Flute","type":"Opera","key":"変ホ長調","seasons":["夏","秋"],"times":["夕暮れ","夜","朝","昼"]},
+        {"k":"K.492","ja_title":"歌劇『フィガロの結婚』","en_title":"The Marriage of Figaro","type":"Opera","key":"ニ長調","seasons":["春"],"times":["朝","昼","夜"]},
+        {"k":"K.527","ja_title":"歌劇『ドン・ジョヴァンニ』","en_title":"Don Giovanni","type":"Opera","key":"ニ短調","seasons":["秋"],"times":["夜","夕暮れ"]},
         {"k":"K.467","ja_title":"ピアノ協奏曲第21番","en_title":"Piano Concerto No. 21","type":"Piano Concerto","key":"ハ長調","seasons":["春","夏"],"times":["朝","昼"]},
         {"k":"K.488","ja_title":"ピアノ協奏曲第23番","en_title":"Piano Concerto No. 23","type":"Piano Concerto","key":"イ長調","seasons":["春","秋"],"times":["昼","夕暮れ"]},
         {"k":"K.466","ja_title":"ピアノ協奏曲第20番","en_title":"Piano Concerto No. 20","type":"Piano Concerto","key":"ニ短調","seasons":["冬","秋"],"times":["夕暮れ","夜"]},
@@ -151,6 +151,9 @@ def extract_json(text: str) -> str:
         return m2.group(1)
     return text.strip()
 
+def is_opera(piece: dict) -> bool:
+    return "opera" in (piece.get("type","") or "").lower() or "歌劇" in (piece.get("ja_title","") or "")
+
 def choose_piece_auto(today: datetime.date):
     works = famous_works()
     jst = now_jst()
@@ -166,9 +169,13 @@ def choose_piece_auto(today: datetime.date):
     return cands[idx]
 
 def piece_label(piece: dict) -> str:
-    # Always include key + K number
-    key = piece.get("key") or "（調性）"
-    return f"{piece['ja_title']} {key} {piece['k']}"
+    # ✅ Opera: omit key; Non-opera: include key + K
+    if is_opera(piece):
+        return f"{piece['ja_title']} {piece['k']}"
+    key = (piece.get("key") or "").strip()
+    if key:
+        return f"{piece['ja_title']} {key} {piece['k']}"
+    return f"{piece['ja_title']} {piece['k']}"
 
 def prompt_text(piece: dict) -> str:
     jst = now_jst()
@@ -178,7 +185,10 @@ def prompt_text(piece: dict) -> str:
     label = piece_label(piece)
     return f"""日本語でモーツァルト作品のX投稿文をJSONで返してください。JSON以外は一切書かないでください。
 以下のヒントを自然に織り込みます：曜日({dow})、時間帯({pod})、季節({sea['jp']}:{sea['text_hint']})。
-必ず、ツイート本文の中に **{label}**（曲名＋調性＋K番号。オペラも含め、必ず調性とK番号を記述）を一度だけ含めます。ハッシュタグは禁止。絵文字は入れなくて良い（後工程で付与）。年月日や時刻は一切書かないでください。
+必ず、ツイート本文の中に **{label}** を一度だけ含めます。
+- オペラ作品は**調性を書かずK番号のみ**（例：歌劇『魔笛』 K.620）
+- オペラ以外は**調性＋K番号**（例：交響曲第40番 ト短調 K.550）
+ハッシュタグは禁止。絵文字は入れなくて良い（後工程で付与）。年月日や時刻は一切書かないでください。
 {{
   "tweet": "<全角込み120字以内。上の条件を満たす。年月日や時刻は書かない。絵文字は入れない>",
   "alt": "<画像の代替テキスト。80-120字。ツイート内容の要素（季節/時間帯/楽器/雰囲気）を簡潔に。絵文字/ハッシュタグは入れない>",
