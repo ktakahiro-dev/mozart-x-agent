@@ -26,7 +26,7 @@ GEN_SIZE = "1536x1024"
 os.makedirs(OUT_DIR, exist_ok=True)
 
 def famous_works():
-    # Data can keep keys for operas, but label logic will omit them
+    # Canonical K numbers (common JP practice). If a work has alternative numbering, main K kept.
     return [
         {"k":"K.525","ja_title":"アイネ・クライネ・ナハトムジーク","en_title":"Eine kleine Nachtmusik","type":"Serenade","key":"ト長調","seasons":["夏","春","秋"],"times":["夕暮れ","夜"]},
         {"k":"K.550","ja_title":"交響曲第40番","en_title":"Symphony No. 40","type":"Symphony","key":"ト短調","seasons":["秋","冬"],"times":["夕暮れ","夜"]},
@@ -45,7 +45,7 @@ def famous_works():
         {"k":"K.622","ja_title":"クラリネット協奏曲","en_title":"Clarinet Concerto","type":"Concerto","key":"イ長調","seasons":["秋"],"times":["夕暮れ","夜"]},
         {"k":"K.581","ja_title":"クラリネット五重奏曲","en_title":"Clarinet Quintet","type":"Chamber","key":"イ長調","seasons":["秋"],"times":["夕暮れ","夜"]},
         {"k":"K.618","ja_title":"アヴェ・ヴェルム・コルプス","en_title":"Ave verum corpus","type":"Choral","key":"ニ長調","seasons":["夏"],"times":["夕暮れ","夜"]},
-        {"k":"K.265","ja_title":"きらきら星変奏曲","en_title":"Twinkle Variations","type":"Piano","key":"ハ長調","seasons":["春","夏","秋","冬"],"times":["朝","昼"]},
+        {"k":"K.265","ja_title":"きらきら星変奏曲","en_title":"Twelve Variations K.265","type":"Piano","key":"ハ長調","seasons":["春","夏","秋","冬"],"times":["朝","昼"]},
         {"k":"K.397","ja_title":"幻想曲 ニ短調","en_title":"Fantasia in D minor","type":"Piano","key":"ニ短調","seasons":["冬","秋"],"times":["夜"]},
         {"k":"K.216","ja_title":"ヴァイオリン協奏曲第3番","en_title":"Violin Concerto No. 3","type":"Violin Concerto","key":"ト長調","seasons":["春"],"times":["昼","朝"]},
         {"k":"K.218","ja_title":"ヴァイオリン協奏曲第4番","en_title":"Violin Concerto No. 4","type":"Violin Concerto","key":"ニ長調","seasons":["春","夏"],"times":["昼"]},
@@ -59,6 +59,7 @@ def famous_works():
 
 EMOJI_RE = re.compile(r"[\\U0001F300-\\U0001FAFF\\U00002700-\\U000027BF]")
 HASHTAG_RE = re.compile(r"#\\S+")
+K_RE = re.compile(r"(?:K|KV)\\s*\\.?\\s*\\d+[a-z]?(?:/\\d+[a-z]?)?", re.I)
 
 def now_jst():
     return datetime.datetime.now(ZoneInfo("Asia/Tokyo"))
@@ -105,8 +106,20 @@ def remove_ymd(text: str) -> str:
     s = text or ""
     for pat in YMD_PATTERNS:
         s = pat.sub("", s)
-    s = re.sub(r"\\s{2,}", " ", s).strip(" 、。")
+    s = re.sub(r"[（）()]", "", s)  # remove stray parens
+    s = re.sub(r"\\s{2,}", " ", s).strip(" 、。-—")
     return s.strip()
+
+def is_opera(piece: dict) -> bool:
+    return "opera" in (piece.get("type","") or "").lower() or "歌劇" in (piece.get("ja_title","") or "")
+
+def piece_label(piece: dict) -> str:
+    if is_opera(piece):
+        return f"{piece['ja_title']} {piece['k']}"
+    key = (piece.get("key") or "").strip()
+    if key:
+        return f"{piece['ja_title']} {key} {piece['k']}"
+    return f"{piece['ja_title']} {piece['k']}"
 
 def emoji_pool(piece: dict, sea: dict, pod: str):
     pool = []
@@ -136,11 +149,33 @@ def pick_rotated_emoji(piece: dict, sea: dict, pod: str, seed_int: int) -> str:
     pool = emoji_pool(piece, sea, pod)
     return pool[seed_int % len(pool)]
 
-def insert_rotated_emoji(text: str, piece: dict, sea: dict, pod: str, seed_int: int) -> str:
-    base = strip_emojis(text)
+def compose_tweet_with_protected_label(body: str, label: str, piece: dict, sea: dict, pod: str, seed_int: int) -> str:
+    # 1) Remove emojis & hashtags & accidental K patterns from body
+    body = strip_emojis(strip_hashtags(body))
+    body = K_RE.sub("", body)
+    body = remove_ymd(body)
+    body = re.sub(r"\\s{2,}", " ", body).strip(" 、。")
+    # 2) Decide emoji first so we can reserve space
     em = pick_rotated_emoji(piece, sea, pod, seed_int)
-    out = (base + " " + em).strip()
-    return clamp(out, 120)
+    # 3) Reserve room: " <space> " + emoji (2 chars incl. space)
+    room_for_label = len(label) + 1  # preceding space before label
+    room_for_emoji = 2  # space + emoji
+    max_body = 120 - room_for_label - room_for_emoji
+    if max_body < 0: max_body = 0
+    body = body[:max_body]
+    body = body.rstrip(" 、。")
+    # 4) Compose as: body + " — " + label + " " + emoji  (if body empty, omit dash)
+    sep = " — " if body else ""
+    tweet = f"{body}{sep}{label} {em}".strip()
+    # 5) Safety clamp (shouldn't cut label because we reserved)
+    if len(tweet) > 120:
+        # drop from body only
+        over = len(tweet) - 120
+        body_cut = max(0, len(body) - over)
+        body = body[:body_cut].rstrip(" 、。")
+        sep = " — " if body else ""
+        tweet = f"{body}{sep}{label} {em}".strip()
+    return tweet
 
 def extract_json(text: str) -> str:
     m = re.search(r"\\{.*\\}", text, re.S)
@@ -151,8 +186,11 @@ def extract_json(text: str) -> str:
         return m2.group(1)
     return text.strip()
 
-def is_opera(piece: dict) -> bool:
-    return "opera" in (piece.get("type","") or "").lower() or "歌劇" in (piece.get("ja_title","") or "")
+def part_of_day(hour: int) -> str:
+    if 5 <= hour < 11: return "朝"
+    if 11 <= hour < 16: return "昼"
+    if 16 <= hour < 20: return "夕暮れ"
+    return "夜"
 
 def choose_piece_auto(today: datetime.date):
     works = famous_works()
@@ -167,15 +205,6 @@ def choose_piece_auto(today: datetime.date):
     sidx = slot_index(jst.hour)
     idx = (int(today.strftime("%Y%m%d")) * 3 + sidx) % len(cands)
     return cands[idx]
-
-def piece_label(piece: dict) -> str:
-    # ✅ Opera: omit key; Non-opera: include key + K
-    if is_opera(piece):
-        return f"{piece['ja_title']} {piece['k']}"
-    key = (piece.get("key") or "").strip()
-    if key:
-        return f"{piece['ja_title']} {key} {piece['k']}"
-    return f"{piece['ja_title']} {piece['k']}"
 
 def prompt_text(piece: dict) -> str:
     jst = now_jst()
@@ -197,6 +226,52 @@ def prompt_text(piece: dict) -> str:
 対象作品: {label}
 口調: 温かく簡潔。専門用語を避ける。
 """
+
+def gen_text_alt_caption(client: OpenAI, piece: dict):
+    label = piece_label(piece)
+    last_error = None
+    for model in [TEXT_MODEL, TEXT_MODEL_FALLBACK]:
+        for attempt in range(1, MAX_TRIES+1):
+            try:
+                raw = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role":"user","content":prompt_text(piece)}],
+                    temperature=0.7
+                ).choices[0].message.content or ""
+                blob = extract_json(raw)
+                data = json.loads(blob)
+                body = (data.get("tweet","") or "")
+                alt = (data.get("alt","") or "")
+                caption = (data.get("img_caption", piece["ja_title"]) or "")
+                # sanitize lengths (alt/caption)
+                def clamp(s,max_len): return s if len(s)<=max_len else s[:max_len-1]+"…"
+                alt = clamp(alt, 120)
+                caption = clamp(caption, 12)
+                # Compose tweet with protected canonical label and reserved emoji room
+                jst = now_jst()
+                pod = part_of_day(jst.hour)
+                sea = season_by_month(jst.month)
+                sidx = slot_index(jst.hour)
+                seed_int = int(jst.strftime("%Y%m%d")) * 3 + sidx
+                tweet = compose_tweet_with_protected_label(body, label, piece, sea, pod, seed_int)
+                print(f"[INFO] used_model={model}, attempt={attempt}, json_ok=True")
+                return tweet, alt, caption
+            except Exception as e:
+                last_error = e
+                print(f"[WARN] JSON parse failed (model={model}, attempt={attempt}): {e}")
+                time.sleep(1.2 * attempt)
+    # Fallback
+    jst = now_jst()
+    pod = part_of_day(jst.hour)
+    sea = season_by_month(jst.month)
+    sidx = slot_index(jst.hour)
+    seed_int = int(jst.strftime("%Y%m%d")) * 3 + sidx
+    body = f"{pod}のひと息に。"
+    tweet = compose_tweet_with_protected_label(body, label, piece, sea, pod, seed_int)
+    alt = "季節と時間帯の光を感じる静かなイラスト。作品のモチーフを柔らかく表現。"
+    caption = piece.get('ja_title', 'モーツァルト')[:12]
+    print(f"[INFO] used_model=fallback_template, json_ok=False")
+    return tweet, alt, caption
 
 def infer_mood(piece: dict):
     title_ja = piece.get("ja_title","") or ""
@@ -260,56 +335,6 @@ def prompt_image(piece: dict, caption: str, tweet_text: str):
 - Background: soft paper texture. Provide a clean central area for Japanese caption "{caption}" with high readability.
 - Keep key elements near center; allow safe 16:9 crop.
 """
-
-def call_chat(client: OpenAI, model: str, prompt: str) -> str:
-    rsp = client.chat.completions.create(
-        model=model,
-        messages=[{"role":"user","content":prompt}],
-        temperature=0.7
-    )
-    return rsp.choices[0].message.content or ""
-
-def gen_text_alt_caption(client: OpenAI, piece: dict):
-    label = piece_label(piece)
-    last_error = None
-    for model in [TEXT_MODEL, TEXT_MODEL_FALLBACK]:
-        for attempt in range(1, MAX_TRIES+1):
-            try:
-                raw = call_chat(client, model, prompt_text(piece))
-                blob = extract_json(raw)
-                data = json.loads(blob)
-                tweet = clamp(strip_hashtags(data.get("tweet","")), 120)
-                alt = clamp(strip_hashtags(data.get("alt","")), 120)
-                caption = clamp(strip_hashtags(data.get("img_caption", piece["ja_title"])), 12)
-                if label not in tweet:
-                    candidate = (tweet + " — " + label).strip()
-                    tweet = clamp(candidate, 120)
-                    if label not in tweet and len(label) < 120:
-                        tweet = clamp(label, 120)
-                tweet = remove_ymd(tweet)
-                jst = now_jst()
-                pod = part_of_day(jst.hour)
-                sea = season_by_month(jst.month)
-                sidx = slot_index(jst.hour)
-                seed_int = int(jst.strftime("%Y%m%d")) * 3 + sidx
-                tweet = insert_rotated_emoji(tweet, piece, sea, pod, seed_int)
-                print(f"[INFO] used_model={model}, attempt={attempt}, json_ok=True")
-                return tweet, alt, caption
-            except Exception as e:
-                last_error = e
-                print(f"[WARN] JSON parse failed (model={model}, attempt={attempt}): {e}")
-                time.sleep(1.2 * attempt)
-    jst = now_jst()
-    pod = part_of_day(jst.hour)
-    sea = season_by_month(jst.month)
-    sidx = slot_index(jst.hour)
-    tweet = clamp(f"{label}。{pod}のひと息に、{sea['text_hint']}とともに。", 120)
-    tweet = remove_ymd(tweet)
-    tweet = insert_rotated_emoji(tweet, piece, sea, pod, int(jst.strftime("%Y%m%d"))*3+sidx)
-    alt = clamp(f"ツイート内容に合わせたビジュアル。{sea['jp']}の雰囲気と{pod}の光、作品のモチーフを織り込む。", 120)
-    caption = clamp(piece.get('ja_title', 'モーツァルト'), 12)
-    print(f"[INFO] used_model=fallback_template, json_ok=False")
-    return tweet, alt, caption
 
 def gen_image_and_fit(client: OpenAI, piece: dict, caption: str, out_path: str, tweet_text: str):
     img = client.images.generate(model=IMAGE_MODEL, prompt=prompt_image(piece, caption, tweet_text), size=GEN_SIZE)
