@@ -57,8 +57,8 @@ def famous_works():
         {"k":"K.314","ja_title":"オーボエ協奏曲","en_title":"Oboe Concerto","type":"Concerto","key":"ハ長調","seasons":["春"],"times":["昼"]},
     ]
 
-EMOJI_RE = re.compile(r"[\U0001F300-\U0001FAFF\U00002700-\U000027BF]")
-HASHTAG_RE = re.compile(r"#\S+")
+EMOJI_RE = re.compile(r"[\\U0001F300-\\U0001FAFF\\U00002700-\\U000027BF]")
+HASHTAG_RE = re.compile(r"#\\S+")
 
 def now_jst():
     return datetime.datetime.now(ZoneInfo("Asia/Tokyo"))
@@ -84,11 +84,25 @@ def clamp(s: str, max_len: int):
 
 def strip_hashtags(s: str) -> str:
     s = HASHTAG_RE.sub("", s or "")
-    s = re.sub(r"\s{2,}", " ", s).strip()
+    s = re.sub(r"\\s{2,}", " ", s).strip()
     return s
 
 def strip_emojis(s: str) -> str:
     return EMOJI_RE.sub("", s or "").strip()
+
+# Remove explicit Y/M/D patterns from tweet text
+YMD_PATTERNS = [
+    re.compile(r"\\d{1,4}年\\d{1,2}月\\d{1,2}日"),
+    re.compile(r"\\d{1,2}月\\d{1,2}日"),
+    re.compile(r"\\d{4}[/-]\\d{1,2}[/-]\\d{1,2}"),
+]
+
+def remove_ymd(text: str) -> str:
+    s = text or ""
+    for pat in YMD_PATTERNS:
+        s = pat.sub("", s)
+    s = re.sub(r"\\s{2,}", " ", s).strip(" 、。")
+    return s.strip()
 
 def emoji_pool(piece: dict, sea: dict, pod: str):
     pool = []
@@ -98,7 +112,6 @@ def emoji_pool(piece: dict, sea: dict, pod: str):
     if "symphony" in t: pool += ["🎻","🎼"]
     if "piano" in t: pool += ["🎹","🎼"]
     if "violin" in t: pool += ["🎻"]
-    # ✅ Clarinet fix: use flute 🪈 as the closest woodwind emoji (sax 🎷 removed)
     if "クラリネット" in title: pool += ["🪈","🎼"]
     if "choral" in t or "ミサ" in title: pool += ["🎶","✨"]
     if "serenade" in t or "divertimento" in t: pool += ["🎶","🌙"]
@@ -129,10 +142,10 @@ def insert_rotated_emoji(text: str, piece: dict, sea: dict, pod: str, seed_int: 
     return clamp(out, 120)
 
 def extract_json(text: str) -> str:
-    m = re.search(r"\{.*\}", text, re.S)
+    m = re.search(r"\\{.*\\}", text, re.S)
     if m:
         return m.group(0)
-    m2 = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.S|re.I)
+    m2 = re.search(r"```(?:json)?\\s*(\\{.*\\})\\s*```", text, re.S|re.I)
     if m2:
         return m2.group(1)
     return text.strip()
@@ -161,14 +174,13 @@ def prompt_text(piece: dict) -> str:
     dow = "月火水木金土日"[jst.weekday()]
     pod = part_of_day(jst.hour)
     sea = season_by_month(jst.month)
-    date_str = jst.strftime("%Y年%m月%d日")
-    time_str = jst.strftime("%H:%M")
     label = piece_label(piece)
+    # ⛳️ 年月日・時刻は含めない。曜日・時間帯・季節のみをヒントとして渡す
     return f"""日本語でモーツァルト作品のX投稿文をJSONで返してください。JSON以外は一切書かないでください。
-以下の要素を自然に織り込みます：日付({date_str})、時刻({time_str} JST)、曜日({dow})、時間帯({pod})、季節({sea['jp']}:{sea['text_hint']})。
-必ず、ツイート本文の中に **{label}**（曲名＋調性＋K番号。調性が無い作品は曲名＋K番号）を一度だけ含めます。ハッシュタグは禁止。絵文字は入れなくて良い（後工程で付与）。
+以下のヒントを自然に織り込みます：曜日({dow})、時間帯({pod})、季節({sea['jp']}:{sea['text_hint']})。
+必ず、ツイート本文の中に **{label}**（曲名＋調性＋K番号。調性が無い作品は曲名＋K番号）を一度だけ含めます。ハッシュタグは禁止。絵文字は入れなくて良い（後工程で付与）。年月日や時刻は一切書かないでください。
 {{
-  "tweet": "<全角込み120字以内。上の条件を満たす。絵文字は入れない>",
+  "tweet": "<全角込み120字以内。上の条件を満たす。年月日や時刻は書かない。絵文字は入れない>",
   "alt": "<画像の代替テキスト。80-120字。ツイート内容の要素（季節/時間帯/楽器/雰囲気）を簡潔に。絵文字/ハッシュタグは入れない>",
   "img_caption": "<画像に入れる短い見出し（8-12字）。絵文字とハッシュタグは入れない>"
 }}
@@ -259,11 +271,15 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 tweet = clamp(strip_hashtags(data.get("tweet","")), 120)
                 alt = clamp(strip_hashtags(data.get("alt","")), 120)
                 caption = clamp(strip_hashtags(data.get("img_caption", piece["ja_title"])), 12)
+                # ensure label once
                 if label not in tweet:
                     candidate = (tweet + " — " + label).strip()
                     tweet = clamp(candidate, 120)
                     if label not in tweet and len(label) < 120:
                         tweet = clamp(label, 120)
+                # Remove any accidental Y/M/D mentions
+                tweet = remove_ymd(tweet)
+                # rotate emoji
                 jst = now_jst()
                 pod = part_of_day(jst.hour)
                 sea = season_by_month(jst.month)
@@ -275,10 +291,12 @@ def gen_text_alt_caption(client: OpenAI, piece: dict):
                 last_error = e
                 print(f"[WARN] JSON parse failed (model={model}, attempt={attempt}): {e}")
                 time.sleep(1.2 * attempt)
+    # Fallback
     jst = now_jst()
     pod = part_of_day(jst.hour)
     sea = season_by_month(jst.month)
     tweet = clamp(f"{label}。{pod}のひと息に、{sea['text_hint']}とともに。", 120)
+    tweet = remove_ymd(tweet)
     tweet = insert_rotated_emoji(tweet, piece, sea, pod, int(jst.strftime("%Y%m%d")))
     alt = clamp(f"ツイート内容に合わせたビジュアル。{sea['jp']}の雰囲気と{pod}の光、作品のモチーフを織り込む。", 120)
     caption = clamp(piece.get('ja_title', 'モーツァルト'), 12)
