@@ -1,2 +1,4 @@
-# Mozart X Agent v18 (proofreading)
-This is a stub if previous cell failed.
+# Mozart X Agent（v20：校正+K番号保護）
+- **生成 → 日本語校正 → K番号ラベル保護（オペラ=Kのみ／非オペラ=調性+K） → 画像(1600x900) → 投稿**
+- 本文：**年月日・時刻・曜日なし**, **ハッシュタグなし**, **絵文字1個ローテ（クラ=🪈）**
+- スケジュール：**06:00/12:00/18:00 JST**（cronはUTC：21:00/03:00/09:00）
