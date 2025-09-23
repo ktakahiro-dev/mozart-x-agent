@@ -1,4 +1,4 @@
-name: Mozart X Agent posts (3x daily JST)
+name: Mozart X Agent posts (1x daily JST)
 on:
   schedule:
     - cron: "0 21 * * *"  # 06:00 JST
